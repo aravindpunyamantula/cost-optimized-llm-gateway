@@ -1,0 +1,17 @@
+fastapi
+uvicorn[standard]
+pydantic
+pydantic-settings
+python-dotenv
+PyYAML
+
+litellm
+tiktoken
+
+redis
+SQLAlchemy
+asyncpg
+
+pytest
+pytest-asyncio
+httpx
