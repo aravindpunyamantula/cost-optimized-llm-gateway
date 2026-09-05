@@ -1,0 +1,41 @@
+models:
+  high_tier: "gpt-4o"
+  mid_tier: "claude-3-5-sonnet-20240620"
+  low_tier: "groq/llama3-8b-8192"
+  embedding: "text-embedding-3-small"
+
+caching:
+  enabled: true
+  similarity_threshold: 0.95
+  ttl: 86400
+
+routing_rules:
+
+  - name: "complex_task_keyword"
+    condition: "contains_keyword"
+    keywords: 
+      - "synthesize"
+      - "analyze"
+      - "critique"
+    target_tier: "high_tier"
+  
+
+  - name: "long_context"
+    condition: "max_tokens_exceeded"
+    threshold: 1000
+    target_tier: "mid_tier"
+
+  - name: "default"
+    condition: "catch_all"
+    target_tier: "low_tier"
+
+  
+fallbacks:
+  - primary: "gpt-4o"
+    backup: "claude-3-5-sonnet-20240620"
+
+  - primary: "claude-3-5-sonnet-20240620"
+    backup: "groq/llama3-8b-8192"
+
+  - primary: "groq/llama3-8b-8192"
+    backup: "gpt-4o"
