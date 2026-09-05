@@ -1,71 +1,56 @@
 import pytest
-from unittest.mock import AsyncMock, patch
 
-from app.core.cache import (
-    CACHE_INDEX_NAME,
-    SemanticCache,
-)
+from app.core.cache import SemanticCache
 
 
 @pytest.mark.asyncio
-async def test_redis_connection():
+async def test_store_and_search_cache():
     cache = SemanticCache()
 
-    try:
-        result = await cache.ping()
-        assert result is True
-    finally:
-        await cache.close()
+    await cache.create_index()
+
+    embedding = [1.0] + [0.0] * 1535
+
+    await cache.store_cache(
+        prompt="What is machine learning?",
+        embedding=embedding,
+        response="Machine learning is a method of learning from data.",
+        model_used="test-model",
+        cost_usd=0.001,
+    )
+
+    result = await cache.search_cache(embedding)
+
+    assert result is not None
+    assert result["response"] == (
+        "Machine learning is a method of learning from data."
+    )
+    assert result["model_used"] == "test-model"
+    assert result["cost_usd"] == pytest.approx(0.001)
+    assert result["similarity"] > 0.95
+
+    await cache.close()
 
 
 @pytest.mark.asyncio
-async def test_create_vector_index():
+async def test_search_cache_miss():
     cache = SemanticCache()
 
-    try:
-        await cache.create_index()
+    await cache.create_index()
 
-        indexes = await cache.redis.execute_command(
-            "FT._LIST"
-        )
+    stored_embedding = [1.0] + [0.0] * 1535
+    different_embedding = [0.0, 1.0] + [0.0] * 1534
 
-        assert CACHE_INDEX_NAME.encode() in indexes
+    await cache.store_cache(
+        prompt="Cached prompt",
+        embedding=stored_embedding,
+        response="Cached response",
+        model_used="test-model",
+        cost_usd=0.001,
+    )
 
-    finally:
-        await cache.close()
-@pytest.mark.asyncio
-async def test_generate_embedding():
-    fake_embedding = [0.1] * 1536
+    result = await cache.search_cache(different_embedding)
 
-    mock_response = type(
-        "MockResponse",
-        (),
-        {
-            "data": [
-                {
-                    "embedding": fake_embedding,
-                }
-            ]
-        },
-    )()
+    assert result is None
 
-    cache = SemanticCache()
-
-    try:
-        with patch(
-            "litellm.aembedding",
-            new_callable=AsyncMock,
-            return_value=mock_response,
-        ) as mock_embedding:
-
-            result = await cache.generate_embedding(
-                "Hello world"
-            )
-
-        mock_embedding.assert_awaited_once()
-
-        assert len(result) == 1536
-        assert result == fake_embedding
-
-    finally:
-        await cache.close()
+    await cache.close()
