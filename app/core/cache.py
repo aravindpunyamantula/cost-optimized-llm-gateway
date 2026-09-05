@@ -107,9 +107,12 @@ class SemanticCache:
         response: str,
         model_used: str,
         cost_usd: float,
+        prompt_tokens: int,
+        completion_tokens: int,
+        total_tokens: int,
     ) -> None:
         """
-        Store an LLM response and its embedding in Redis.
+        Store an LLM response, token usage, cost, and embedding in Redis.
         """
         cache_key = self._cache_key(prompt)
 
@@ -122,6 +125,9 @@ class SemanticCache:
                 "response": response,
                 "model_used": model_used,
                 "cost_usd": str(cost_usd),
+                "prompt_tokens": str(prompt_tokens),
+                "completion_tokens": str(completion_tokens),
+                "total_tokens": str(total_tokens),
                 "embedding": embedding_bytes,
             },
         )
@@ -134,9 +140,9 @@ class SemanticCache:
         )
 
     async def search_cache(
-    self,
-    embedding: list[float],
-) -> dict | None:
+        self,
+        embedding: list[float],
+    ) -> dict | None:
         """
         Search Redis for the most semantically similar cached response.
 
@@ -170,11 +176,14 @@ class SemanticCache:
                 "vector_score",
                 "ASC",
                 "RETURN",
-                "5",
+                "8",
                 "prompt",
                 "response",
                 "model_used",
                 "cost_usd",
+                "prompt_tokens",
+                "completion_tokens",
+                "total_tokens",
                 "vector_score",
                 "DIALECT",
                 "2",
@@ -223,8 +232,18 @@ class SemanticCache:
         response = extra_attributes.get(b"response")
         model_used = extra_attributes.get(b"model_used")
         cost_usd = extra_attributes.get(b"cost_usd")
+        prompt_tokens = extra_attributes.get(b"prompt_tokens")
+        completion_tokens = extra_attributes.get(b"completion_tokens")
+        total_tokens = extra_attributes.get(b"total_tokens")
 
-        if response is None or model_used is None or cost_usd is None:
+        if (
+            response is None
+            or model_used is None
+            or cost_usd is None
+            or prompt_tokens is None
+            or completion_tokens is None
+            or total_tokens is None
+        ):
             return None
 
         if isinstance(response, bytes):
@@ -236,9 +255,21 @@ class SemanticCache:
         if isinstance(cost_usd, bytes):
             cost_usd = cost_usd.decode("utf-8")
 
+        if isinstance(prompt_tokens, bytes):
+            prompt_tokens = prompt_tokens.decode("utf-8")
+
+        if isinstance(completion_tokens, bytes):
+            completion_tokens = completion_tokens.decode("utf-8")
+
+        if isinstance(total_tokens, bytes):
+            total_tokens = total_tokens.decode("utf-8")
+
         return {
             "response": response,
             "model_used": model_used,
             "cost_usd": float(cost_usd),
+            "prompt_tokens": int(prompt_tokens),
+            "completion_tokens": int(completion_tokens),
+            "total_tokens": int(total_tokens),
             "similarity": similarity,
         }

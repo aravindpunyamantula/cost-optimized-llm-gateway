@@ -7,6 +7,7 @@ from app.core.cache import SemanticCache
 async def test_store_and_search_cache():
     cache = SemanticCache()
 
+    await cache.redis.flushdb()
     await cache.create_index()
 
     embedding = [1.0] + [0.0] * 1535
@@ -17,6 +18,9 @@ async def test_store_and_search_cache():
         response="Machine learning is a method of learning from data.",
         model_used="test-model",
         cost_usd=0.001,
+        prompt_tokens=5,
+        completion_tokens=8,
+        total_tokens=13,
     )
 
     result = await cache.search_cache(embedding)
@@ -26,30 +30,38 @@ async def test_store_and_search_cache():
         "Machine learning is a method of learning from data."
     )
     assert result["model_used"] == "test-model"
-    assert result["cost_usd"] == pytest.approx(0.001)
+    assert result["cost_usd"] == 0.001
+    assert result["prompt_tokens"] == 5
+    assert result["completion_tokens"] == 8
+    assert result["total_tokens"] == 13
     assert result["similarity"] > 0.95
 
     await cache.close()
 
 
 @pytest.mark.asyncio
-async def test_search_cache_miss():
+async def test_cache_miss_below_similarity_threshold():
     cache = SemanticCache()
 
+    await cache.redis.flushdb()
     await cache.create_index()
 
     stored_embedding = [1.0] + [0.0] * 1535
-    different_embedding = [0.0, 1.0] + [0.0] * 1534
+
+    query_embedding = [0.0, 1.0] + [0.0] * 1534
 
     await cache.store_cache(
-        prompt="Cached prompt",
+        prompt="What is machine learning?",
         embedding=stored_embedding,
         response="Cached response",
         model_used="test-model",
         cost_usd=0.001,
+        prompt_tokens=3,
+        completion_tokens=4,
+        total_tokens=7,
     )
 
-    result = await cache.search_cache(different_embedding)
+    result = await cache.search_cache(query_embedding)
 
     assert result is None
 
